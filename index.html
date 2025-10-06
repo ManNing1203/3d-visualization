@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Forkasatria Demo</title>
+  <title>3D People Visualization</title>
   <style>
     body {
       font-family: sans-serif;
@@ -10,38 +10,91 @@
       margin: 0;
       overflow: hidden;
     }
+    
+    /* Login Screen */
+    #loginScreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    
+    #loginScreen h1 {
+      color: #fff;
+      margin-bottom: 30px;
+    }
+    
+    #loginScreen.hidden {
+      display: none;
+    }
+    
+    /* User Info Display */
+    #userInfo {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      color: #fff;
+      font-size: 14px;
+      z-index: 100;
+      display: none;
+    }
+    
+    #userInfo img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      vertical-align: middle;
+      margin-right: 10px;
+    }
+    
+    #userInfo.visible {
+      display: block;
+    }
+    
     .element {
-  width: 160px;
-  height: 200px;
-  box-shadow: 0 0 12px rgba(0,255,255,0.5);
-  border: 1px solid rgba(127,255,255,0.25);
-  text-align: center;
-  line-height: normal;
-  cursor: default;
-  border-radius: 10px;
-  overflow: hidden;
-  background: #111;
-  color: white;
-}
-.element:hover {
-  filter: brightness(1.0);
-  box-shadow: 0 0 20px rgba(255,255,255,0.7);
-}
+      width: 160px;
+      height: 200px;
+      box-shadow: 0 0 12px rgba(0,255,255,0.5);
+      border: 1px solid rgba(127,255,255,0.25);
+      text-align: center;
+      line-height: normal;
+      cursor: default;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #111;
+      color: white;
+    }
+    
+    .element:hover {
+      filter: brightness(1.0);
+      box-shadow: 0 0 20px rgba(255,255,255,0.7);
+    }
+    
     .element img {
       width: 100%;
       height: 100px;
       object-fit: cover;
     }
+    
     .element div {
       font-size: 14px;
       margin: 2px 0;
     }
+    
     .menu {
       position: absolute;
       bottom: 20px;
       width: 100%;
       text-align: center;
     }
+    
     .menu button {
       color: white;
       background: transparent;
@@ -52,34 +105,66 @@
       border-radius: 5px;
       margin: 0 5px;
     }
+    
     .menu button:hover {
       background-color: rgba(0,255,255,0.25);
     }
+    
     .menu button.active {
-  background-color: rgba(0,255,255,0.5);
-  color: #000;
-}
+      background-color: rgba(0,255,255,0.5);
+      color: #000;
+    }
   </style>
 </head>
 <body>
 
-<div id="container"></div>
-<div class="menu">
+<!-- Login Screen -->
+<div id="loginScreen">
+  <h1>3D People Visualization</h1>
+  <div id="g_id_onload"
+       data-client_id="109828991473-hf1edu0vrj2one5cd55kv57t68rtsp7h.apps.googleusercontent.com"
+       data-callback="handleCredentialResponse"
+       data-auto_prompt="false">
+  </div>
+  <div class="g_id_signin"
+       data-type="standard"
+       data-size="large"
+       data-theme="filled_blue"
+       data-text="sign_in_with"
+       data-shape="rectangular"
+       data-logo_alignment="left">
+  </div>
+</div>
+
+<!-- User Info -->
+<div id="userInfo">
+  <img id="userPhoto" src="" alt="User">
+  <span id="userName"></span>
+</div>
+
+<!-- 3D Visualization -->
+<div id="container" style="display:none;"></div>
+<div class="menu" style="display:none;">
   <button id="table" class="active">Table</button>
   <button id="sphere">Sphere</button>
   <button id="helix">Double Helix</button>
   <button id="grid">Grid</button>
 </div>
 
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<!-- Three.js and dependencies -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/TrackballControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/renderers/CSS3DRenderer.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+
 <script>
-  let camera, scene, renderer;
-  let controls;
+  let camera, scene, renderer, controls;
   let objects = [];
   let targets = { table: [], sphere: [], helix: [], grid: [] };
+  let accessToken = null;
 
   const people = [
   ["Lee Siew Suan", "https://static.kasatria.com/pivot-img/photo/019.jpg", "25", "CN", "Writing", "$251,260.80"],
@@ -284,14 +369,77 @@
   ["Collen McClintock", "https://static.kasatria.com/pivot-img/photo/G_039.jpg", "51", "US", "Gardening", "$261,883.20"]
 ];
 
+  // Google Sign-In Callback
+  function handleCredentialResponse(response) {
+    // Decode JWT token
+    const userData = parseJwt(response.credential);
+    
+    // Display user info
+    document.getElementById('userName').textContent = userData.name;
+    document.getElementById('userPhoto').src = userData.picture;
+    document.getElementById('userInfo').classList.add('visible');
+    
+    // Hide login screen
+    document.getElementById('loginScreen').classList.add('hidden');
+    
+    // Show visualization
+    document.getElementById('container').style.display = 'block';
+    document.querySelector('.menu').style.display = 'block';
+    
+    // Request access token for Google Sheets API
+    requestAccessToken();
+    
+    // Initialize 3D visualization
+    init();
+    animate();
+  }
 
-  init();
-  animate();
+  // Parse JWT token
+  function parseJwt(token) {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  }
+
+  // Request Access Token for Google Sheets API
+  function requestAccessToken() {
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: '109828991473-hf1edu0vrj2one5cd55kv57t68rtsp7h.apps.googleusercontent.com',
+      scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+      callback: (tokenResponse) => {
+        accessToken = tokenResponse.access_token;
+        console.log('Access token obtained');
+        // Optionally: fetch data from Google Sheets here
+        // fetchGoogleSheetData(accessToken);
+      },
+    });
+    client.requestAccessToken();
+  }
+
+  // Optional: Fetch data from Google Sheets
+  function fetchGoogleSheetData(token) {
+    const spreadsheetId = 'YOUR_SPREADSHEET_ID';
+    const range = 'Sheet1!A:F'; // Adjust range as needed
+    
+    fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log('Sheet data:', data);
+      // Process and use the data here
+    })
+    .catch(error => console.error('Error fetching sheet:', error));
+  }
 
   function init() {
     camera = new THREE.PerspectiveCamera(40, window.innerWidth/window.innerHeight, 1, 10000);
     camera.position.z = 3000;
-
     scene = new THREE.Scene();
 
     // Create elements
@@ -301,147 +449,115 @@
       element.className = 'element';
 
       element.innerHTML = `
-        <img src="${img}">
+        <img src="${img}" alt="${name}">
         <div><b>${name}</b></div>
         <div>${age} | ${country}</div>
         <div>${hobby}</div>
         <div>${worth}</div>
       `;
 
-      // Color background by worth with hover glow
-const income = parseFloat(worth.replace(/[$,]/g, ""));
-if (income < 100000) {
-  element.style.background = "darkred";
-  element.style.boxShadow = "0 0 12px darkred";
-} else if (income < 200000) {
-  element.style.background = "darkorange";
-  element.style.boxShadow = "0 0 12px darkorange";
-} else {
-  element.style.background = "darkgreen";
-  element.style.boxShadow = "0 0 12px darkgreen";
-}
+      // Color by net worth
+      const income = parseFloat(worth.replace(/[$,]/g, ""));
+      if (income < 100000) {
+        element.style.background = "darkred";
+      } else if (income < 200000) {
+        element.style.background = "darkorange";
+      } else {
+        element.style.background = "darkgreen";
+      }
 
       const objectCSS = new THREE.CSS3DObject(element);
       objectCSS.position.x = Math.random() * 4000 - 2000;
       objectCSS.position.y = Math.random() * 4000 - 2000;
       objectCSS.position.z = Math.random() * 4000 - 2000;
       scene.add(objectCSS);
-
       objects.push(objectCSS);
 
-      // === Table Layout (20x10) ===
-      const object = new THREE.Object3D();
-      object.position.x = (i % 20) * 180 - 1700;
-      object.position.y = -(Math.floor(i / 20) % 10) * 220 + 900;
-      targets.table.push(object);
+      // Table layout (20x10)
+      const tableObj = new THREE.Object3D();
+      tableObj.position.x = (i % 20) * 180 - 1700;
+      tableObj.position.y = -(Math.floor(i / 20) % 10) * 220 + 900;
+      targets.table.push(tableObj);
     }
 
-    // === Sphere Layout ===
-const vector = new THREE.Vector3();
-const spherical = new THREE.Spherical();
-for (let i = 0, l = objects.length; i < l; i++) {
-  const phi = Math.acos(-1 + (2 * i) / l);
-  const theta = Math.sqrt(l * Math.PI) * phi;
-  const object = new THREE.Object3D();
-  spherical.set(1200, phi, theta); // Changed from 800 to 1200
-  object.position.setFromSpherical(spherical);
-  vector.copy(object.position).multiplyScalar(2);
-  object.lookAt(vector);
-  targets.sphere.push(object);
-}
+    // Sphere layout
+    const vector = new THREE.Vector3();
+    const spherical = new THREE.Spherical();
+    for (let i = 0; i < objects.length; i++) {
+      const phi = Math.acos(-1 + (2 * i) / objects.length);
+      const theta = Math.sqrt(objects.length * Math.PI) * phi;
+      const sphereObj = new THREE.Object3D();
+      spherical.set(1200, phi, theta);
+      sphereObj.position.setFromSpherical(spherical);
+      vector.copy(sphereObj.position).multiplyScalar(2);
+      sphereObj.lookAt(vector);
+      targets.sphere.push(sphereObj);
+    }
 
-    // === Double Helix Layout ===
-for (let i = 0; i < objects.length; i++) {
-  const theta = i * 0.175 + (i % 2) * Math.PI; // Offset every other element by 180 degrees
-  const y = -(i * 16) + 1600; // Better vertical spacing
-  const object = new THREE.Object3D();
-  object.position.setFromCylindricalCoords(900, theta, y);
-  
-  const vector = new THREE.Vector3();
-  vector.x = object.position.x * 2;
-  vector.y = object.position.y;
-  vector.z = object.position.z * 2;
-  object.lookAt(vector);
-  
-  targets.helix.push(object);
-}
+    // Double Helix layout
+    for (let i = 0; i < objects.length; i++) {
+      const theta = i * 0.175 + (i % 2) * Math.PI;
+      const y = -(i * 16) + 1600;
+      const helixObj = new THREE.Object3D();
+      helixObj.position.setFromCylindricalCoords(900, theta, y);
+      const v = new THREE.Vector3();
+      v.x = helixObj.position.x * 2;
+      v.y = helixObj.position.y;
+      v.z = helixObj.position.z * 2;
+      helixObj.lookAt(v);
+      targets.helix.push(helixObj);
+    }
 
-    // === Grid Layout (5x4x10) ===
-for (let i = 0; i < objects.length; i++) {
-  const object = new THREE.Object3D();
-  object.position.x = ((i % 5) * 400) - 800;
-  object.position.y = (-(Math.floor((i / 5) % 4)) * 400) + 600;
-  object.position.z = (-(Math.floor(i / 20)) * 1000) + 2000;
-  targets.grid.push(object);
-}
+    // Grid layout (5x4x10)
+    for (let i = 0; i < objects.length; i++) {
+      const gridObj = new THREE.Object3D();
+      gridObj.position.x = ((i % 5) * 400) - 800;
+      gridObj.position.y = (-(Math.floor((i / 5) % 4)) * 400) + 600;
+      gridObj.position.z = (-(Math.floor(i / 20)) * 1000) + 2000;
+      targets.grid.push(gridObj);
+    }
 
     renderer = new THREE.CSS3DRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.getElementById('container').appendChild(renderer.domElement);
 
-controls = new THREE.TrackballControls(camera, renderer.domElement);
+    controls = new THREE.TrackballControls(camera, renderer.domElement);
+    controls.minDistance = 500;
+    controls.maxDistance = 6000;
 
-if (controls) {
-  controls.minDistance = 500;
-  controls.maxDistance = 6000;
-  controls.rotateSpeed = 2.0;
-  controls.zoomSpeed = 1.2;
-  controls.panSpeed = 0.8;
-  controls.dynamicDampingFactor = 0.2;
-} else {
-  console.error("TrackballControls failed to initialize");
-}
-
-    // // Button events
-    // document.getElementById('table').addEventListener('click', () => transform(targets.table, 2000));
-    // document.getElementById('sphere').addEventListener('click', () => transform(targets.sphere, 2000));
-    // document.getElementById('helix').addEventListener('click', () => transform(targets.helix, 2000));
-    // document.getElementById('grid').addEventListener('click', () => transform(targets.grid, 2000));
+    // Button events
+    const buttons = ['table', 'sphere', 'helix', 'grid'];
+    buttons.forEach(btnId => {
+      document.getElementById(btnId).addEventListener('click', function() {
+        buttons.forEach(b => document.getElementById(b).classList.remove('active'));
+        this.classList.add('active');
+        transform(targets[btnId], 2000);
+      });
+    });
 
     transform(targets.table, 2000);
     window.addEventListener('resize', onWindowResize);
   }
 
-  // Button events
-const buttons = ['table', 'sphere', 'helix', 'grid'];
-buttons.forEach(btnId => {
-  document.getElementById(btnId).addEventListener('click', function() {
-    // Remove active class from all buttons
-    buttons.forEach(b => document.getElementById(b).classList.remove('active'));
-    // Add active class to clicked button
-    this.classList.add('active');
-    // Transform to target
-    transform(targets[btnId], 2000);
-  });
-});
-
-// Set initial active state
-transform(targets.table, 2000);
-
-  function transform(targets, duration) {
-  TWEEN.removeAll();
-  
-  for (let i = 0; i < objects.length; i++) {
-    const object = objects[i];
-    const target = targets[i];
-    
-    new TWEEN.Tween(object.position)
-      .to({ x: target.position.x, y: target.position.y, z: target.position.z }, Math.random() * duration + duration)
-      .easing(TWEEN.Easing.Exponential.InOut)
-      .start();
+  function transform(targetsArray, duration) {
+    TWEEN.removeAll();
+    for (let i = 0; i < objects.length; i++) {
+      const object = objects[i];
+      const target = targetsArray[i];
       
-    new TWEEN.Tween(object.rotation)
-      .to({ x: target.rotation.x, y: target.rotation.y, z: target.rotation.z }, Math.random() * duration + duration)
-      .easing(TWEEN.Easing.Exponential.InOut)
-      .start();
+      new TWEEN.Tween(object.position)
+        .to({ x: target.position.x, y: target.position.y, z: target.position.z }, 
+            Math.random() * duration + duration)
+        .easing(TWEEN.Easing.Exponential.InOut)
+        .start();
+        
+      new TWEEN.Tween(object.rotation)
+        .to({ x: target.rotation.x, y: target.rotation.y, z: target.rotation.z }, 
+            Math.random() * duration + duration)
+        .easing(TWEEN.Easing.Exponential.InOut)
+        .start();
+    }
   }
-  
-  // Smooth camera zoom out for sphere
-  new TWEEN.Tween(camera.position)
-    .to({ z: 3500 }, duration)
-    .easing(TWEEN.Easing.Exponential.InOut)
-    .start();
-}
 
   function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -452,7 +568,7 @@ transform(targets.table, 2000);
   function animate() {
     requestAnimationFrame(animate);
     TWEEN.update();
-    controls.update();
+    if (controls) controls.update();
     renderer.render(scene, camera);
   }
 </script>
