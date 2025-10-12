@@ -149,6 +149,7 @@
   <button id="sphere">Sphere</button>
   <button id="helix">Double Helix</button>
   <button id="grid">Grid</button>
+  <button id="pyramid">Pyramid</button>
 </div>
 
 <!-- Google Identity Services -->
@@ -163,7 +164,7 @@
 <script>
   let camera, scene, renderer, controls;
   let objects = [];
-  let targets = { table: [], sphere: [], helix: [], grid: [] };
+  let targets = { table: [], sphere: [], helix: [], grid: [], pyramid: [] };
   let accessToken = null;
 
   const people = [
@@ -517,6 +518,77 @@
       targets.grid.push(gridObj);
     }
 
+    // Pyramid layout (tetrahedron) - larger with better distribution
+    const pyramidHeight = 1800;  // Increased from 1200
+    const pyramidBase = 1500;     // Increased from 1000
+    
+    // Define the 4 vertices of the tetrahedron
+    const vertices = [
+      new THREE.Vector3(0, pyramidHeight, 0), // Apex
+      new THREE.Vector3(-pyramidBase, -pyramidHeight/3, pyramidBase), // Base vertex 1
+      new THREE.Vector3(pyramidBase, -pyramidHeight/3, pyramidBase), // Base vertex 2
+      new THREE.Vector3(0, -pyramidHeight/3, -pyramidBase) // Base vertex 3
+    ];
+    
+    // Define the 4 faces (triangles)
+    const faces = [
+      [0, 1, 2], // Front face
+      [0, 2, 3], // Right face
+      [0, 3, 1], // Left face
+      [1, 3, 2]  // Base face
+    ];
+    
+    let pyramidIndex = 0;
+    const totalObjects = objects.length;
+    const objectsPerFace = Math.ceil(totalObjects / faces.length);
+    
+    for (let f = 0; f < faces.length && pyramidIndex < totalObjects; f++) {
+      const [v1, v2, v3] = faces[f];
+      const p1 = vertices[v1];
+      const p2 = vertices[v2];
+      const p3 = vertices[v3];
+      
+      // Calculate face normal for orientation
+      const edge1 = new THREE.Vector3().subVectors(p2, p1);
+      const edge2 = new THREE.Vector3().subVectors(p3, p1);
+      const normal = new THREE.Vector3().crossVectors(edge1, edge2).normalize();
+      
+      // Create grid on triangular face
+      const gridSize = Math.ceil(Math.sqrt(objectsPerFace * 2)) + 2;
+      let placedOnThisFace = 0;
+      
+      for (let i = 0; i <= gridSize && pyramidIndex < totalObjects && placedOnThisFace < objectsPerFace; i++) {
+        for (let j = 0; j <= gridSize - i && pyramidIndex < totalObjects && placedOnThisFace < objectsPerFace; j++) {
+          // Calculate barycentric coordinates with proper spacing
+          const u = i / gridSize;
+          const v = j / gridSize;
+          const w = 1 - u - v;
+          
+          // Keep away from edges
+          const margin = 0.05;
+          if (w > margin && u > margin && v > margin) {
+            const pyramidObj = new THREE.Object3D();
+            
+            // Position on triangle surface
+            pyramidObj.position.x = p1.x * w + p2.x * u + p3.x * v;
+            pyramidObj.position.y = p1.y * w + p2.y * u + p3.y * v;
+            pyramidObj.position.z = p1.z * w + p2.z * u + p3.z * v;
+            
+            // Orient object perpendicular to face
+            const lookAtPoint = new THREE.Vector3().addVectors(
+              pyramidObj.position, 
+              normal.clone().multiplyScalar(200)
+            );
+            pyramidObj.lookAt(lookAtPoint);
+            
+            targets.pyramid.push(pyramidObj);
+            pyramidIndex++;
+            placedOnThisFace++;
+          }
+        }
+      }
+    }
+
     renderer = new THREE.CSS3DRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.getElementById('container').appendChild(renderer.domElement);
@@ -526,7 +598,7 @@
     controls.maxDistance = 6000;
 
     // Button events
-    const buttons = ['table', 'sphere', 'helix', 'grid'];
+    const buttons = ['table', 'sphere', 'helix', 'grid', 'pyramid'];
     buttons.forEach(btnId => {
       document.getElementById(btnId).addEventListener('click', function() {
         buttons.forEach(b => document.getElementById(b).classList.remove('active'));
